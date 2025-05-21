@@ -1,0 +1,98 @@
+#include <Evo.h>
+#include <SoftwareSerial.h>
+
+EVOX1 evo;
+EvoBNO055 bno(I2C2);
+
+EvoMotor driveMotor(M1, EV3MediumMotor, true);    
+EvoMotor steerMotor(M2, EV3MediumMotor, true);
+
+float x, y, z;
+float heading;
+
+const int TARGET_HEADING = 0;
+const int DRIVE_DISTANCE = 7200;
+
+const int MAX_STEER_ANGLE = 30;
+const int MIN_STEER_SPEED = 1000;
+
+const float Kp = 10.0;
+const float Kd = 60.0;
+
+float pError = 0;
+
+float calculateHeadingError(float current, float target)
+{
+  float error = target - current;
+  if (error > 180) error -= 360;
+  if (error < -180) error += 360;
+  return error;
+}
+
+void setup()
+{
+  evo.begin();
+  bno.begin();
+  driveMotor.begin();
+  steerMotor.begin();
+
+  steerMotor.resetAngle();
+  driveMotor.resetAngle();
+
+  evo.writeLineToDisplay("Heading Track 0°", 0, true, true);
+  delay(1000);
+}
+
+void loop()
+{
+  driveMotor.resetAngle();
+
+  while (driveMotor.getAngle() < DRIVE_DISTANCE)
+  {
+    bno.getEuler(&x, &y, &z);
+    heading = x;
+    if (heading < 0) heading += 360;
+    if (heading >= 360) heading -= 360;
+
+    float error = calculateHeadingError(heading, TARGET_HEADING);
+    float derivative = error - pError;
+    int steerSpeed = (int)(Kp * error + Kd * derivative);
+
+    if (steerSpeed != 0 && abs(steerSpeed) < MIN_STEER_SPEED)
+      steerSpeed = (steerSpeed > 0) ? MIN_STEER_SPEED : -MIN_STEER_SPEED;
+    steerSpeed = constrain(steerSpeed, -2000, 2000);
+
+    int currentSteer = steerMotor.getAngle();
+    if ((steerSpeed > 0 && currentSteer < MAX_STEER_ANGLE) ||
+        (steerSpeed < 0 && currentSteer > -MAX_STEER_ANGLE))
+    {
+      steerMotor.run(steerSpeed);
+    }
+    else
+    {
+      steerMotor.brake();
+    }
+
+    driveMotor.run(-4000);
+
+    evo.clearDisplay();
+    evo.writeToDisplay("Heading:", 0, 0);
+    evo.writeToDisplay((int)heading, 70, 0);
+    evo.writeToDisplay("Error:", 0, 16);
+    evo.writeToDisplay((int)error, 70, 16);
+    evo.writeToDisplay("Progress:", 0, 32);
+    evo.writeToDisplay(driveMotor.getAngle(), 80, 32);
+    evo.drawDisplay();
+
+    pError = error;
+    delay(50);
+  }
+
+  driveMotor.coast();
+
+  steerMotor.runTarget(2000, 0, MotorStop::HOLD, true);
+
+  evo.clearDisplay();
+  evo.writeLineToDisplay("Done Tracking", 0, true, true);
+  while (true);
+}
