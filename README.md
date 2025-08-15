@@ -4,7 +4,7 @@ This repository contains engineering materials of SSTactical's self-driven vehic
 ## Content
 * Photos contain 2 folders holding photos of the team and the vehicle.
    * Team ----- contains 2 photos of the team (an official one and one funny photo with all team members)
-      - 
+     
    * Vehicle ----- contains 6 photos of the vehicle (from every side, from top and bottom)
       - Back View.jpeg contains 1 photo of the back view of our bot
       - Bottom View.jpeg contains 1 photo of the bottom view of our bot
