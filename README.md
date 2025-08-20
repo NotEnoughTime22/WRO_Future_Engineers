@@ -2,7 +2,7 @@
 
 This repository contains engineering materials of SSTactical's self-driven vehicle model that is competing in the WRO Future Engineers competition in the 2025 season.
 ## Content
-* Photos contain 2 folders holding photos of the team and the vehicle.
+* Photos [here](myLib/README.md) contain 2 folders holding photos of the team and the vehicle.
    * Team ----- contains 2 photos of the team (an official one and one funny photo with all team members)
      
    * Vehicle ----- contains 6 photos of the vehicle (from every side, from top and bottom)
