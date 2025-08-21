@@ -15,4 +15,11 @@ This repository contains engineering materials of SSTactical's self-driven vehic
       - `Left View.jpeg` contains 1 photo of the left view of our bot
       - `Right View.jpeg` contains 1 photo of the right view of our bot
       - `Top View.jpeg` contains 1 photo of the top view of our bot
-* `Schemes`
+* `Schemes` contains several schematic diagrams in the form of JPEG, PNG or PDF of the electromechanical components illustrating all the elements (electronic components and motors) used in the vehicle and how they connect to each other.
+   * `Microcontroller Wiring Diagram.png` contains a photo of our Microcontroller System Diagram.
+   * `Overall System Wiring Diagram.png` contains a photo of our Overall System Wiring Diagram.
+* `Software` contains the code of our software for all the components which were programmed to participate in the competition.
+  * `Code` contains the code used to program the robot for each challenge.
+    - `WRO_Future_Engineers_Colour2` is the code for the round with the blocks (Edit this)
+    -  `WRO_Future_Engineers_MK5` is the code for the open challenge (Edit this)
+  * `Library` contains each and every library used in the code.
