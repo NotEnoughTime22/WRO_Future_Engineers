@@ -3,7 +3,7 @@
 This repository contains engineering materials of SSTactical's self-driven vehicle model that is competing in the WRO Future Engineers competition in the 2025 season.
 ## Content
 * `Documents` contain the Engineering Journal of the team.
-* `Modela` contain the model files used by 3D printers, laser cutting machines and CNC machines to produce the vehicle elements. [If there is nothing to add to this location, the directory can be removed.]
+* `Models` contain the model files used by 3D printers, laser cutting machines and CNC machines to produce the vehicle elements. [If there is nothing to add to this location, the directory can be removed.]
    * `EVO Brick Model.stl` is the 3D model of the case holding our EvolutonX1 Brick.
    * `VL53L0X Lego Mount Model.stl` is the 3D model of a mount for our Time of Flight (ToF). 
 * `Photos` contains 2 folders holding photos of the team and the vehicle.
@@ -23,3 +23,5 @@ This repository contains engineering materials of SSTactical's self-driven vehic
     - `WRO_Future_Engineers_Colour2` is the code for the round with the blocks (Edit this)
     -  `WRO_Future_Engineers_MK5` is the code for the open challenge (Edit this)
   * `Library` contains each and every library used in the code.
+    - `Library/Evo.zip` is our library required to run our microcontroller, with other external libraries in the folder.
+    - `Library/Eternal_libraries` is a folder containing all necessary .zip libraries to be added to the Arduino IDE in order for EVERYTHING to function.
