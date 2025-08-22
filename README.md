@@ -56,6 +56,8 @@ This repository contains engineering materials of SSTactical's self-driven vehic
    7. IO Multiiplexor -- SX1506 **(x1)**
    8. Battery -- NCR18650B **(x2)**
 
-**BEST OF LUCK!!!**
+
+
+                         **BEST OF LUCK!!!**
 
 
