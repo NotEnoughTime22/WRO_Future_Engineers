@@ -1,39 +1,39 @@
 #include <Evo.h>
 #include <SoftwareSerial.h>
 
-// Hardware setup
+// hardware setup
 EVOX1 evo;
 EvoBNO055 bno(I2C2);
 EvoMotor driveMotor(M1, EV3MediumMotor, true);
 EvoMotor steerMotor(M2, EV3MediumMotor, true);
 EvoVL53L0X leftSensor(I2C3);
 EvoVL53L0X rightSensor(I2C4);
-EvoHuskyLens hl(I2C1);  // Added HuskyLens
-HUSKYLENSResult result;  // Added HuskyLens result
+EvoHuskyLens hl(I2C1);  // huskylens variable
+HUSKYLENSResult result;  // huskylens result
 
-// Constants
+// constants
 const int STEER_SPEED = 4000;
 const int DRIVE_SPEED = -1200;
-const int THRESHOLD = 1800;  // Reduced for earlier detection
-const int GAP_THRESHOLD = 1950;  // Additional threshold for gap detection
+const int THRESHOLD = 1800;  // threshold before considered gap
+const int GAP_THRESHOLD = 1750;  // threshold for gaps
 const int MAX_STEER_ANGLE = 65;
-const float KP = 5.0f;  // Increased for stronger heading tracking
+const float KP = 5.0f;  //increased for agressive heading tracking
 const int POST_TURN_DISTANCE = 1000;
 const unsigned long MIN_TURN_INTERVAL = 1500;
 const int TOTAL_TURNS = 12;  // 3 complete squares
-const int MIN_TRAVEL_DISTANCE = 100; // Minimum distance to travel before returning
-const int ACCEPTABLE_INCREASE = 500; // Accpetable increase before being considered a gap
+const int MIN_TRAVEL_DISTANCE = 100; // minimum distance travelled before returning
+const int ACCEPTABLE_INCREASE = 600; 
 
-// Color detection constants
-const int RED_ID = 2;    // Red has ID 2 in HuskyLens
-const int GREEN_ID = 1;  // Green has ID 1 in HuskyLens
-const int MIN_COLOR_SIZE = 100;  // Minimum object size to consider
+// color detection constants
+const int RED_ID = 2;    // red is ID 2 
+const int GREEN_ID = 1;  // green is ID 1 
+const int MIN_COLOR_SIZE = 100;  // minimum object size to consider
 
-// Averaging system constants
-const int BUFFER_SIZE = 200;  // Store 1 second of readings at ~10ms intervals
-const int READINGS_PER_AVERAGE = 5;  // Average every 10 readings for smoothing
+// averaging system constants
+const int BUFFER_SIZE = 10;  // 10ms interval between averages
+const int READINGS_PER_AVERAGE = 5;  // average of 5 readings
 
-// State variables
+// state variables
 float heading = 0;
 float targetHeading = 0;
 int phase = 0;  // 0=straight, 1=turning, 2=forward after turn, 3=color turn, 4=color return, 5=color back
@@ -41,19 +41,19 @@ int turnsCompleted = 0;
 long forwardStartPos = 0;
 unsigned long lastTurnTime = 0;
 
-// Color detection state variables
+// color detection state variables
 bool colorOverrideActive = false;
 unsigned long colorOverrideStartTime = 0;
 int colorOverrideDirection = 0;  // -1 for left (green), +1 for right (red)
 bool colorTurnCompleted = false;
 int lastDetectedColorID = 0;
 
-// Distance tracking variables for color avoidance
-long outwardStartPos = 0;  // Motor position when starting outward travel
-long outwardDistance = 0;  // Distance traveled outward
-long returnStartPos = 0;   // Motor position when starting return travel
+// distance tracking variables for color avoidance
+long outwardStartPos = 0;  // motor position when starting outward travel
+long outwardDistance = 0;  // distance traveled away
+long returnStartPos = 0;   // motor position when starting return travel
 
-// Sensor averaging buffers
+// sensor averaging buffers
 struct SensorBuffer {
   int leftReadings[BUFFER_SIZE];
   int rightReadings[BUFFER_SIZE];
@@ -71,7 +71,7 @@ struct SensorBuffer {
     if (count < BUFFER_SIZE) count++;
   }
   
-  // Get average of readings from the last 1 second
+  // get average of readings from last second
   void getOneSecondAverage(int& leftAvg, int& rightAvg) {
     unsigned long currentTime = millis();
     unsigned long oneSecondAgo = currentTime - 1000;
@@ -79,7 +79,7 @@ struct SensorBuffer {
     long leftSum = 0, rightSum = 0;
     int validCount = 0;
     
-    // Sum readings from the last 1 second
+    // sum readings from the last 1 second
     for (int i = 0; i < count; i++) {
       int bufferIndex = (index - 1 - i + BUFFER_SIZE) % BUFFER_SIZE;
       if (timestamps[bufferIndex] >= oneSecondAgo) {
@@ -87,7 +87,7 @@ struct SensorBuffer {
         rightSum += rightReadings[bufferIndex];
         validCount++;
       } else {
-        break;  // Older readings, stop here
+        break;  // older readings stop here
       }
     }
     
@@ -95,14 +95,14 @@ struct SensorBuffer {
       leftAvg = leftSum / validCount;
       rightAvg = rightSum / validCount;
     } else {
-      // Fallback to most recent reading
+      // fallback to most recent reading
       int recentIndex = (index - 1 + BUFFER_SIZE) % BUFFER_SIZE;
       leftAvg = leftReadings[recentIndex];
       rightAvg = rightReadings[recentIndex];
     }
   }
   
-  // Get current smoothed reading (average of last few readings)
+  // get smoothed reading 
   void getCurrentSmoothed(int& leftSmooth, int& rightSmooth) {
     int samplesToAverage = min(READINGS_PER_AVERAGE, count);
     if (samplesToAverage == 0) {
@@ -125,7 +125,7 @@ struct SensorBuffer {
 
 SensorBuffer sensorBuffer;
 
-// Utility functions
+// utility functions
 float normalize(float angle) {
   while (angle < 0) angle += 360;
   while (angle >= 360) angle -= 360;
@@ -139,17 +139,17 @@ float headingError(float current, float target) {
   return error;
 }
 
-// Improved sensor reading with outlier rejection
+// improved sensor reading with outlier rejection
 int cleanSensorReading(int rawReading, int lastGoodReading) {
-  // Handle sensor errors and timeouts
+  // handle sensor errors and timeouts
   if (rawReading <= 0) return lastGoodReading;
-  if (rawReading >= 8000) return 2000;
+  if (rawReading >= 8000) return 8000;
   
-  // Reject extreme outliers (likely noise)
+  // reject extreme outliers (noise)
   if (lastGoodReading > 0) {
     int difference = abs(rawReading - lastGoodReading);
     if (difference > 1500 && rawReading < 100) {
-      // Likely a noise spike, use last good reading
+      // likely noise spike, use last accurate reading
       return lastGoodReading;
     }
   }
@@ -157,20 +157,20 @@ int cleanSensorReading(int rawReading, int lastGoodReading) {
   return rawReading;
 }
 
-// Color detection function
+// color detection function
 void checkColorDetection() {
-  // Only check colors during straight phase
+  // only check colors at straight phase
   if (phase != 0) return;
   
-  // Request color detection from HuskyLens
+  //get color detection from huskylens
   bool colorDetected = false;
   if (hl.requestBlocks(result)) {
-    // Check if detected object is large enough
+    //check if detected object big enough
     int objectSize = result.width * result.height;
     
     if (objectSize >= MIN_COLOR_SIZE) {
       if (result.ID == RED_ID || result.ID == GREEN_ID) {
-        // Only detect colors below y level 16 (ignore objects higher up)
+        //detect colors below y level 160 (above this value is too far)
         if (result.yCenter <= 160) {
           colorDetected = true;
           lastDetectedColorID = result.ID;
@@ -179,48 +179,48 @@ void checkColorDetection() {
     }
   }
   
-  // If we're currently in a color override and no longer see the color
+  //if currently in a color override and no longer see the color
   if (colorOverrideActive && !colorDetected) {
-    // Check if we've traveled minimum distance
+    //check if we've traveled minimum distance
     long currentPos = driveMotor.getAngle();
     outwardDistance = abs(currentPos - outwardStartPos);
     
     if (outwardDistance >= MIN_TRAVEL_DISTANCE) {
       colorOverrideActive = false;
       
-      // Set target to -45° (opposite direction) to return
+      //set target to -45° (opposite direction) to return
       if (colorOverrideDirection == 1) {
-        // Was turning right, now turn left to return
-        targetHeading = normalize(targetHeading - 90);  // From +45° to -45°
+        //was turning right, now turn left to return
+        targetHeading = normalize(targetHeading - 90);  //from +45° to -45°
       } else {
-        // Was turning left, now turn right to return
-        targetHeading = normalize(targetHeading + 90);  // From -45° to +45°
+        // was turning left, now turn right to return
+        targetHeading = normalize(targetHeading + 90);  //from -45° to +45°
       }
       
-      returnStartPos = currentPos;  // Mark start of return journey
-      phase = 4;  // Color return phase
+      returnStartPos = currentPos;  //start of return journey
+      phase = 4;  //color return phase
     }
     return;
   }
   
-  // If we detect a new color and aren't already in color mode
+  //if detect a new color and not alr in color mode
   if (colorDetected && !colorOverrideActive) {
     colorOverrideActive = true;
     colorOverrideStartTime = millis();
-    outwardStartPos = driveMotor.getAngle();  // Mark start of outward travel
+    outwardStartPos = driveMotor.getAngle();  //start of outward travel
     
     if (lastDetectedColorID == RED_ID) {
-      // Red detected - turn right 45°
-      colorOverrideDirection = 1;   // Right turn
+      //red detected - turn right 45°
+      colorOverrideDirection = 1;   //right turn
       targetHeading = normalize(targetHeading + 45);
     } else if (lastDetectedColorID == GREEN_ID) {
-      // Green detected - turn left 45°
-      colorOverrideDirection = -1;  // Left turn
+      //green detected - turn left 45°
+      colorOverrideDirection = -1;  //left turn
       targetHeading = normalize(targetHeading - 45);
     }
     
-    phase = 3;  // Color turn phase
-    lastTurnTime = millis();  // Update turn time to prevent gap detection interference
+    phase = 3;  // color turn phase
+    lastTurnTime = millis();  //update turn time to prevent gap detection interference
   }
 }
 
@@ -231,13 +231,13 @@ void setup() {
   steerMotor.begin();
   leftSensor.begin();
   rightSensor.begin();
-  hl.begin();  // Initialize HuskyLens
+  hl.begin();  // initialize huskylens
   
   steerMotor.flipEncoderDirection(true);
   steerMotor.resetAngle();
   driveMotor.resetAngle();
   
-  // Setup HuskyLens for color recognition
+  //setup huskylens for color recognition
   hl.setMode(ALGORITHM_COLOR_RECOGNITION);
   
   evo.writeLineToDisplay("3 Rounds + Color", 0, true, true);
@@ -258,10 +258,10 @@ void setup() {
 }
 
 void loop() {
-  // Check for color detection first
+  //check for color detection first
   checkColorDetection();
   
-  // Read sensors with improved error handling
+  // read sensors with improved error handling
   static int lastLeftReading = 1000;
   static int lastRightReading = 1000;
   
@@ -274,31 +274,31 @@ void loop() {
   lastLeftReading = leftDist;
   lastRightReading = rightDist;
   
-  // Add readings to buffer
+  // add readings to buffer
   sensorBuffer.addReading(leftDist, rightDist);
   
-  // Get smoothed current readings and 1-second averages
+  //get smoothed current readings and 1-second averages
   int leftSmooth, rightSmooth;
   int leftAvg, rightAvg;
   sensorBuffer.getCurrentSmoothed(leftSmooth, rightSmooth);
   sensorBuffer.getOneSecondAverage(leftAvg, rightAvg);
   
-  // Get heading with basic error protection
+  //get heading with basic error protection
   float x, y, z;
   static unsigned long lastValidReading = 0;
   static float lastValidHeading = 0;
   
   bno.getEuler(&x, &y, &z);
   
-  // Check if reading seems valid (not NaN or extreme values)
+  // check if reading seems valid (not NaN or extreme values)
   if (!isnan(x) && x >= 0 && x < 360) {
     heading = normalize(x);
     lastValidHeading = heading;
     lastValidReading = millis();
   } else {
-    // Use last valid heading if sensor gives invalid data
+    //use last valid heading if sensor gives invalid data
     heading = lastValidHeading;
-    // If sensor has been failing for too long, reset to 0
+    // if sensor has been failing for too long, reset to 0
     if (millis() - lastValidReading > 2000) {
       heading = 0;
       lastValidHeading = 0;
@@ -308,7 +308,7 @@ void loop() {
   
   float error = headingError(heading, targetHeading);
 
-  // Add watchdog protection - reset if stuck in one phase too long
+  // add protection - reset if stuck in one phase too long
   static unsigned long phaseStartTime = 0;
   static int lastPhase = -1;
   
@@ -317,89 +317,89 @@ void loop() {
     lastPhase = phase;
   }
   
-  // If stuck in any phase for too long, reset to straight
-  if ((phase == 1 || phase == 2 || phase == 3 || phase == 4 || phase == 5) && (millis() - phaseStartTime > 10000)) {
-    phase = 0;  // Force back to straight mode
-    targetHeading = heading;  // Accept current heading as target
-    colorOverrideActive = false;  // Clear color override
+  //if stuck in any phase for too long, reset to straight
+  if ((phase == 1 || phase == 2 || phase == 3 || phase == 4 || phase == 5) && (millis() - phaseStartTime > 30000)) {
+    phase = 0;  // back to straight mode
+    targetHeading = heading;  // accept current heading as target
+    colorOverrideActive = false;  // clear color override
   }
   
-  // State machine
+  // state machine
   if (phase == 0) {
-    // STRAIGHT PHASE
-    // Simple steering based on heading error
+    //straight phase (not michael)
+    // simple steering based on heading error
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Drive forward
+    // drive forward
     driveMotor.run(DRIVE_SPEED);
     
-    // Gap detection (only if not overridden by color)
+    // gap detection (only if not overridden by color)
     if (!colorOverrideActive) {
-      // Enhanced gap detection using both current smoothed and averaged readings
+      // enhanced gap detection using both current smoothed and averaged readings
       bool leftGapCurrent = leftSmooth > THRESHOLD;
       bool rightGapCurrent = rightSmooth > THRESHOLD;
       bool leftGapAverage = leftAvg > GAP_THRESHOLD;
       bool rightGapAverage = rightAvg > GAP_THRESHOLD;
       
-      // Early detection: trigger on current readings, confirm with averages
+      // early detection: trigger on current readings, confirm with averages
       bool leftGap = leftGapCurrent || leftGapAverage;
       bool rightGap = rightGapCurrent || rightGapAverage;
       
-      // Additional early detection: look for increasing distance trend
+      // additional early detection: look for increasing distance trend
       bool leftIncreasing = (leftSmooth > lastLeftReading + ACCEPTABLE_INCREASE);
       bool rightIncreasing = (rightSmooth > lastRightReading + ACCEPTABLE_INCREASE);
       
       bool timeOK = (millis() - lastTurnTime) > MIN_TURN_INTERVAL;
       
-      // Turn if gap detected (with trend consideration) and enough time has passed
+      // turn if gap detected (with trend consideration) and enough time has passed
       if (((leftGap || leftIncreasing) || (rightGap || rightIncreasing)) && timeOK) {
         
-        // Use 1-second averages for turn direction decision
+        // use 1-second averages for turn direction decision
         if ((leftAvg > GAP_THRESHOLD || leftIncreasing) && !(rightAvg > GAP_THRESHOLD)) {
-          targetHeading = normalize(targetHeading - 90);  // Turn left toward left gap
+          targetHeading = normalize(targetHeading - 90);  // turn left toward left gap
         } else if ((rightAvg > GAP_THRESHOLD || rightIncreasing) && !(leftAvg > GAP_THRESHOLD)) {
-          targetHeading = normalize(targetHeading + 90);  // Turn right toward right gap
+          targetHeading = normalize(targetHeading + 90);  // turn right toward right gap
         } else {
-          // Both gaps or both increasing - turn toward larger average gap
+          // both gaps or both increasing - turn toward larger average gap
           if (leftAvg > rightAvg) {
-            targetHeading = normalize(targetHeading - 90);  // Turn left
+            targetHeading = normalize(targetHeading - 90);  //turn left
           } else {
-            targetHeading = normalize(targetHeading + 90);  // Turn right
+            targetHeading = normalize(targetHeading + 90);  // turn right
           }
         }
         
-        phase = 1;  // Switch to turning
-        lastTurnTime = millis();  // Record turn time
+        phase = 1;  // switch to turning
+        lastTurnTime = millis();  // record turn time
       }
     }
     
   } else if (phase == 1) {
-    // GAP-BASED TURNING PHASE (90° turns for square)
-    // Turn gently
+    //turning phase (90° turns for square)
+    // turn gently
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Keep driving while turning (slower)
+    // keep driving while turning (slower)
     driveMotor.run(DRIVE_SPEED);
     
-    // Check if turn is complete
-    if (abs(error) < 8) {  // Slightly more lenient
+    // check if turn is complete
+    if (abs(error) < 8) {  //buffer
       turnsCompleted++;
       
-      // Straighten wheels - NON-BLOCKING
+      // straighten wheels - non-blocking
       steerMotor.runTarget(STEER_SPEED, 0, MotorStop::HOLD, false);
       
-      // Check if 3 complete squares are done
+      // check if 3 squares done
       if (turnsCompleted >= TOTAL_TURNS) {
         driveMotor.coast();
         steerMotor.runTarget(STEER_SPEED, 0, MotorStop::HOLD, false);
         evo.clearDisplay();
         evo.writeLineToDisplay("3 ROUNDS DONE!", 0, true, true);
         
-        // Non-blocking end - just stop motors and continue display updates
+        // non-blocking end - just stop motors and continue display updates
         while(true) {
           driveMotor.coast();
           steerMotor.coast();
@@ -407,84 +407,84 @@ void loop() {
         }
       }
       
-      // Start forward movement to clear the gap area
+      //start forward movement to clear the gap area
       forwardStartPos = driveMotor.getAngle();
       phase = 2;
     }
     
   } else if (phase == 2) {
-    // FORWARD AFTER GAP TURN PHASE
+    //forward after gap
     long currentPos = driveMotor.getAngle();
     long distanceTraveled = abs(currentPos - forwardStartPos);
     
-    // Simple heading hold
+    // simple heading hold
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Drive forward
+    // drive forward
     driveMotor.run(DRIVE_SPEED);
     
-    // Check if we've gone far enough
+    // check if far enough
     if (distanceTraveled >= POST_TURN_DISTANCE) {
-      phase = 0;  // Back to straight
+      phase = 0;  // back to straight
     }
     
   } else if (phase == 3) {
-    // COLOR TURN PHASE (45° turn)
-    // Turn gently to 45° angle
+    // color turn (45° turn)
+    // turn gently to 45° angle
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Keep driving while turning
+    //keep driving while turning
     driveMotor.run(DRIVE_SPEED);
     
-    // Check if 45° turn is complete
+    //check if 45° turn is complete
     if (abs(error) < 8) {
       // 45° turn completed, continue checking for color while driving at angle
-      phase = 0;  // Return to straight mode but maintain 45° heading
+      phase = 0;  // return to straight mode but maintain 45° heading
     }
     
   } else if (phase == 4) {
-    // COLOR RETURN PHASE (turning to -45° to return)
-    // Turn to opposite 45° angle to return
+    // colour return (turning to -45° to return)
+    // turn opposite 45° angle to return
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Keep driving while turning to return angle
+    // keep driving while turning to return angle
     driveMotor.run(DRIVE_SPEED);
     
-    // Check if return turn is complete
+    // check if return turn is complete
     if (abs(error) < 8) {
-      // Turn completed, now travel back the same distance
-      phase = 5;  // Switch to return travel phase
+      // turn completed, now travel back the same distance
+      phase = 5;  // switch to return travel phase
     }
     
   } else if (phase == 5) {
-    // COLOR RETURN TRAVEL PHASE (traveling back the outward distance)
-    // Drive straight at return angle
+    // return to straight (traveling back the outward distance)
+    // drive straight
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Drive forward
+    // drive forward
     driveMotor.run(DRIVE_SPEED);
     
-    // Check if we've traveled back the same distance we went out
+    // check if we've traveled back the same distance we went out
     long currentPos = driveMotor.getAngle();
     long returnDistance = abs(currentPos - returnStartPos);
     
     if (returnDistance >= outwardDistance) {
-      // Traveled back the same distance, now return to straight (0°)
+      // traveled back the same distance, now return to straight (0°)
       targetHeading = 0;
-      phase = 0;  // Return directly to straight mode
+      phase = 0;  // return directly to straight mode
       colorOverrideDirection = 0;
     }
   }
   
-  // Enhanced display with color detection info
+  //better display with color detection info
   evo.clearDisplay();
   evo.writeToDisplay("L:", 0, 0);   evo.writeToDisplay(leftSmooth, 15, 0);
   evo.writeToDisplay("/", 35, 0);   evo.writeToDisplay(leftAvg, 42, 0);
@@ -493,15 +493,15 @@ void loop() {
   evo.writeToDisplay("H:", 0, 16);  evo.writeToDisplay((int)heading, 20, 16);
   evo.writeToDisplay("T:", 60, 16); evo.writeToDisplay((int)targetHeading, 80, 16);
   
-  // Show turns completed or distance info for color phases
+  //show turns completed or distance info for color phases
   if (phase == 3 && colorOverrideActive) {
-    // Show outward distance being traveled
+    //show outward distance
     long currentPos = driveMotor.getAngle();
     long currentOutward = abs(currentPos - outwardStartPos);
     evo.writeToDisplay("Out:", 0, 32);  evo.writeToDisplay((int)currentOutward, 30, 32);
     evo.writeToDisplay("/", 60, 32);    evo.writeToDisplay(MIN_TRAVEL_DISTANCE, 65, 32);
   } else if (phase == 5) {
-    // Show return distance vs target
+    //show return distance vs target
     long currentPos = driveMotor.getAngle();
     long currentReturn = abs(currentPos - returnStartPos);
     evo.writeToDisplay("Ret:", 0, 32);  evo.writeToDisplay((int)currentReturn, 30, 32);
@@ -511,7 +511,7 @@ void loop() {
     evo.writeToDisplay("/12", 70, 32);
   }
   
-  // Display phase and color status
+  // show phase and color status
   evo.writeToDisplay("P:", 0, 48);  
   if (phase == 0) evo.writeToDisplay("STR", 20, 48);
   else if (phase == 1) evo.writeToDisplay("TRN", 20, 48);
@@ -520,7 +520,7 @@ void loop() {
   else if (phase == 4) evo.writeToDisplay("RTN", 20, 48);
   else if (phase == 5) evo.writeToDisplay("BCK", 20, 48);
   
-  // Show color override status
+  //show color override status
   if (colorOverrideActive) {
     evo.writeToDisplay("C:", 50, 48);
     if (colorOverrideDirection == -1) evo.writeToDisplay("GRN", 65, 48);

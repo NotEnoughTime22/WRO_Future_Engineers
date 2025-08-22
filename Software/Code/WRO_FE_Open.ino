@@ -1,7 +1,7 @@
 #include <Evo.h>
 #include <SoftwareSerial.h>
 
-// Hardware setup
+// hardware setup
 EVOX1 evo;
 EvoBNO055 bno(I2C2);
 EvoMotor driveMotor(M1, EV3MediumMotor, true);
@@ -9,30 +9,30 @@ EvoMotor steerMotor(M2, EV3MediumMotor, true);
 EvoVL53L0X leftSensor(I2C3);
 EvoVL53L0X rightSensor(I2C4);
 
-// Constants
+//constants
 const int STEER_SPEED = 4000;
 const int DRIVE_SPEED = -2000;
-const int THRESHOLD = 700;  // Reduced for earlier detection
-const int GAP_THRESHOLD = 900;  // Additional threshold for gap detection
+const int THRESHOLD = 700;  //reduced 
+const int GAP_THRESHOLD = 900;  //additional threshold as backup
 const int MAX_STEER_ANGLE = 65;
 const float KP = 3.0f;
 const int POST_TURN_DISTANCE = 1500;
 const unsigned long MIN_TURN_INTERVAL = 1500;
-const int TOTAL_TURNS = 12;  // 3 complete squares
+const int TOTAL_TURNS = 12;  //3 squares
 
-// Averaging system constants
-const int BUFFER_SIZE = 100;  // Store 1 second of readings at ~10ms intervals
-const int READINGS_PER_AVERAGE = 10;  // Average every 10 readings for smoothing
+// averaging system constants
+const int BUFFER_SIZE = 100;  // store readings at 10ms intervals
+const int READINGS_PER_AVERAGE = 10;  //average 10 readings for smoothing
 
-// State variables
+//state variables
 float heading = 0;
 float targetHeading = 0;
-int phase = 0;  // 0=straight, 1=turning, 2=forward after turn
+int phase = 0;  //0=straight, 1=turning, 2=forward after turn
 int turnsCompleted = 0;
 long forwardStartPos = 0;
 unsigned long lastTurnTime = 0;
 
-// Sensor averaging buffers
+//sensor averaging buffers
 struct SensorBuffer {
   int leftReadings[BUFFER_SIZE];
   int rightReadings[BUFFER_SIZE];
@@ -50,7 +50,7 @@ struct SensorBuffer {
     if (count < BUFFER_SIZE) count++;
   }
   
-  // Get average of readings from the last 1 second
+  //get average of readings from the last 1 second
   void getOneSecondAverage(int& leftAvg, int& rightAvg) {
     unsigned long currentTime = millis();
     unsigned long oneSecondAgo = currentTime - 1000;
@@ -58,7 +58,7 @@ struct SensorBuffer {
     long leftSum = 0, rightSum = 0;
     int validCount = 0;
     
-    // Sum readings from the last 1 second
+    //sum readings from the last 1 second
     for (int i = 0; i < count; i++) {
       int bufferIndex = (index - 1 - i + BUFFER_SIZE) % BUFFER_SIZE;
       if (timestamps[bufferIndex] >= oneSecondAgo) {
@@ -66,7 +66,7 @@ struct SensorBuffer {
         rightSum += rightReadings[bufferIndex];
         validCount++;
       } else {
-        break;  // Older readings, stop here
+        break;  //older readings
       }
     }
     
@@ -74,14 +74,14 @@ struct SensorBuffer {
       leftAvg = leftSum / validCount;
       rightAvg = rightSum / validCount;
     } else {
-      // Fallback to most recent reading
+      //fallback to most recent reading
       int recentIndex = (index - 1 + BUFFER_SIZE) % BUFFER_SIZE;
       leftAvg = leftReadings[recentIndex];
       rightAvg = rightReadings[recentIndex];
     }
   }
   
-  // Get current smoothed reading (average of last few readings)
+  //get current smoothed reading
   void getCurrentSmoothed(int& leftSmooth, int& rightSmooth) {
     int samplesToAverage = min(READINGS_PER_AVERAGE, count);
     if (samplesToAverage == 0) {
@@ -104,7 +104,7 @@ struct SensorBuffer {
 
 SensorBuffer sensorBuffer;
 
-// Utility functions
+//utility functions
 float normalize(float angle) {
   while (angle < 0) angle += 360;
   while (angle >= 360) angle -= 360;
@@ -118,17 +118,17 @@ float headingError(float current, float target) {
   return error;
 }
 
-// Improved sensor reading with outlier rejection
+//improved sensor reading with outlier rejection
 int cleanSensorReading(int rawReading, int lastGoodReading) {
   // Handle sensor errors and timeouts
   if (rawReading <= 0) return lastGoodReading;
   if (rawReading >= 8000) return 2000;
   
-  // Reject extreme outliers (likely noise)
+  //reject extreme outliers (likely noise)
   if (lastGoodReading > 0) {
     int difference = abs(rawReading - lastGoodReading);
     if (difference > 1500 && rawReading < 100) {
-      // Likely a noise spike, use last good reading
+      //noise spike, use last good reading
       return lastGoodReading;
     }
   }
@@ -160,7 +160,7 @@ void setup() {
 }
 
 void loop() {
-  // Read sensors with improved error handling
+  //improved error handling
   static int lastLeftReading = 1000;
   static int lastRightReading = 1000;
   
@@ -173,31 +173,31 @@ void loop() {
   lastLeftReading = leftDist;
   lastRightReading = rightDist;
   
-  // Add readings to buffer
+  //add readings to buffer
   sensorBuffer.addReading(leftDist, rightDist);
   
-  // Get smoothed current readings and 1-second averages
+  //get smoothed readings
   int leftSmooth, rightSmooth;
   int leftAvg, rightAvg;
   sensorBuffer.getCurrentSmoothed(leftSmooth, rightSmooth);
   sensorBuffer.getOneSecondAverage(leftAvg, rightAvg);
   
-  // Get heading with basic error protection
+  //get heading with basic error protection
   float x, y, z;
   static unsigned long lastValidReading = 0;
   static float lastValidHeading = 0;
   
   bno.getEuler(&x, &y, &z);
   
-  // Check if reading seems valid (not NaN or extreme values)
+  //check if reading valid (not extreme values)
   if (!isnan(x) && x >= 0 && x < 360) {
     heading = normalize(x);
     lastValidHeading = heading;
     lastValidReading = millis();
   } else {
-    // Use last valid heading if sensor gives invalid data
+    //use last valid heading if sensor gives invalid data
     heading = lastValidHeading;
-    // If sensor has been failing for too long, reset to 0
+    //if sensor has been failing for too long, reset to 0
     if (millis() - lastValidReading > 2000) {
       heading = 0;
       lastValidHeading = 0;
@@ -207,7 +207,7 @@ void loop() {
   
   float error = headingError(heading, targetHeading);
 
-  // Add watchdog protection - reset if stuck in one phase too long
+  //reset if stuck in one phase too long
   static unsigned long phaseStartTime = 0;
   static int lastPhase = -1;
   
@@ -216,85 +216,85 @@ void loop() {
     lastPhase = phase;
   }
   
-  // If stuck in turning or forward phase for too long, reset to straight
+  //if stuck in turning or forward phase for too long, reset to straight
   if ((phase == 1 || phase == 2) && (millis() - phaseStartTime > 10000)) {
     phase = 0;  // Force back to straight mode
     targetHeading = heading;  // Accept current heading as target
   }
   
-  // State machine
+  //state machine
   if (phase == 0) {
-    // STRAIGHT PHASE
-    // Simple steering based on heading error
+    //straight phase
+    //simple steering based on heading error
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Drive forward
+    //drive forward
     driveMotor.run(DRIVE_SPEED);
     
-    // Enhanced gap detection using both current smoothed and averaged readings
+    // enhanced gap detection using both current smoothed and averaged readings
     bool leftGapCurrent = leftSmooth > THRESHOLD;
     bool rightGapCurrent = rightSmooth > THRESHOLD;
     bool leftGapAverage = leftAvg > GAP_THRESHOLD;
     bool rightGapAverage = rightAvg > GAP_THRESHOLD;
     
-    // Early detection: trigger on current readings, confirm with averages
+    //early detection: trigger on current readings, confirm with averages
     bool leftGap = leftGapCurrent || leftGapAverage;
     bool rightGap = rightGapCurrent || rightGapAverage;
     
-    // Additional early detection: look for increasing distance trend
+    //additional early detection: look for increasing distance trend
     bool leftIncreasing = (leftSmooth > lastLeftReading + 100);
     bool rightIncreasing = (rightSmooth > lastRightReading + 100);
     
     bool timeOK = (millis() - lastTurnTime) > MIN_TURN_INTERVAL;
     
-    // Turn if gap detected (with trend consideration) and enough time has passed
+    //turn if gap detected and time ok
     if (((leftGap || leftIncreasing) || (rightGap || rightIncreasing)) && timeOK) {
       
-      // Use 1-second averages for turn direction decision
+      //use 1-second averages for turn direction decision
       if ((leftAvg > GAP_THRESHOLD || leftIncreasing) && !(rightAvg > GAP_THRESHOLD)) {
-        targetHeading = normalize(targetHeading - 90);  // Turn left toward left gap
+        targetHeading = normalize(targetHeading - 90);  //turn left toward left gap
       } else if ((rightAvg > GAP_THRESHOLD || rightIncreasing) && !(leftAvg > GAP_THRESHOLD)) {
-        targetHeading = normalize(targetHeading + 90);  // Turn right toward right gap
+        targetHeading = normalize(targetHeading + 90);  //turn right toward right gap
       } else {
-        // Both gaps or both increasing - turn toward larger average gap
+        //both gaps or both increasing - turn toward larger average gap
         if (leftAvg > rightAvg) {
-          targetHeading = normalize(targetHeading - 90);  // Turn left
+          targetHeading = normalize(targetHeading - 90);  // turn left
         } else {
-          targetHeading = normalize(targetHeading + 90);  // Turn right
+          targetHeading = normalize(targetHeading + 90);  // turn right
         }
       }
       
-      phase = 1;  // Switch to turning
-      lastTurnTime = millis();  // Record turn time
+      phase = 1;  //switch to turning
+      lastTurnTime = millis();  //record turn time
     }
     
   } else if (phase == 1) {
-    // TURNING PHASE
-    // Turn gently
+    // turning phase
+    //turn gently
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Keep driving while turning (slower)
+    //keep driving while turning (slower)
     driveMotor.run(DRIVE_SPEED);
     
-    // Check if turn is complete
+    // check if turn is complete
     if (abs(error) < 8) {  // Slightly more lenient
       turnsCompleted++;
       
-      // Straighten wheels - NON-BLOCKING
+      // straighten wheels (non blocking)
       steerMotor.runTarget(STEER_SPEED, 0, MotorStop::HOLD, false);
       
-      // Check if 3 complete squares are done
+      //check if 3 squares are done
       if (turnsCompleted >= TOTAL_TURNS) {
         driveMotor.coast();
         steerMotor.runTarget(STEER_SPEED, 0, MotorStop::HOLD, false);
         evo.clearDisplay();
         evo.writeLineToDisplay("3 ROUNDS DONE!", 0, true, true);
         
-        // Non-blocking end - just stop motors and continue display updates
+        // non blocking end. stop motors and continue display updates
         while(true) {
           driveMotor.coast();
           steerMotor.coast();
@@ -302,31 +302,31 @@ void loop() {
         }
       }
       
-      // Start forward movement to clear the gap area
+      //start forward movement to clear the gap area
       forwardStartPos = driveMotor.getAngle();
       phase = 2;
     }
     
   } else if (phase == 2) {
-    // FORWARD AFTER TURN PHASE
+    //forward after turn
     long currentPos = driveMotor.getAngle();
     long distanceTraveled = abs(currentPos - forwardStartPos);
     
-    // Simple heading hold
+    //heading hold
     float steerAngle = -error * KP;
     steerAngle = constrain(steerAngle, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
     steerMotor.runTarget(STEER_SPEED, (int)steerAngle, MotorStop::HOLD, false);
     
-    // Drive forward
+    // drive forward
     driveMotor.run(DRIVE_SPEED);
     
-    // Check if we've gone far enough
+    // check if we've gone far enough
     if (distanceTraveled >= POST_TURN_DISTANCE) {
-      phase = 0;  // Back to straight
+      phase = 0;  // back to straight
     }
   }
   
-  // Enhanced display with averaging info
+  // display with averaged info
   evo.clearDisplay();
   evo.writeToDisplay("L:", 0, 0);   evo.writeToDisplay(leftSmooth, 15, 0);
   evo.writeToDisplay("/", 35, 0);   evo.writeToDisplay(leftAvg, 42, 0);
