@@ -1,5 +1,5 @@
 # Photos
-This section contains two folders:
+This directory contains two folders:
  * Team
    - `Team Formal Photo.jpeg` (A formal photo with every member in the team)
  * Vehicle
