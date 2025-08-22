@@ -58,6 +58,7 @@ This repository contains engineering materials of SSTactical's self-driven vehic
 
 
 
-                         **BEST OF LUCK!!!**
+
+**BEST OF LUCK!!!**
 
 
