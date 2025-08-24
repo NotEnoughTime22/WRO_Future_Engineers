@@ -20,8 +20,8 @@ This repository contains engineering materials of SSTactical's self-driven vehic
    * `Overall System Wiring Diagram.png` contains a photo of our Overall System Wiring Diagram.
 * `Software` contains the code of our software for all the components which were programmed to participate in the competition.
   * `Code` contains the code used to program the robot for each challenge.
-    - `WRO_Future_Engineers_Colour2` is the code for the round with the blocks                           (Edit this)
-    -  `WRO_Future_Engineers_MK5` is the code for the open challenge                                     (Edit this)
+    - `WRO_FE_Colour.ino` is the code for the challenge round.               
+    - `WRO_FE_Open.ino` is the code for the preliminary round.        
   * `Library` contains each and every library used in the code.
     - `Library/Evo.zip` is our library required to run our microcontroller, with other external libraries in the folder.
     - `Library/External_libraries` is a folder containing all necessary .zip libraries to be added to the Arduino IDE in order for EVERYTHING to function.
@@ -29,7 +29,7 @@ This repository contains engineering materials of SSTactical's self-driven vehic
 # Usage
   1.⁠ ⁠Install the libraries found in the Software/Library/External_libraries by going to the library manager in the Arduino IDE and installing each of them through the Add .ZIP Library. -- **ALL LIBRARIES ARE REQUIRED FOR THE CODE TO RUN CORRECTLY.** 
   2.⁠ ⁠Install Software/Library/Evo.zip and follow the following on the Arduino IDE: Sketch --> Include Library --> Add .ZIP Library --> Select EvoEditted.zip. 
-  3.⁠ ⁠Open the desired file (i.e. mainopen.ino or mainobject.ino) with the Arduino IDE.                      (EDiT this )
+  3.⁠ ⁠Open the desired file (i.e. WRO_FE_Colour.ino or WRO_FE_Open.ino) with the Arduino IDE.                    
 
 ## Reminders before running the bot:
 * Software
