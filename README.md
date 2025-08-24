@@ -27,9 +27,9 @@ This repository contains engineering materials of SSTactical's self-driven vehic
     - `Library/External_libraries` is a folder containing all necessary .zip libraries to be added to the Arduino IDE in order for EVERYTHING to function.
 ## Introduction
 # Usage
-  1.⁠ ⁠Install the libraries found in the Software/Library/External_libraries by going to the library manager in the Arduino IDE and installing each of them through the Add .ZIP Library. -- **ALL LIBRARIES ARE REQUIRED FOR THE CODE TO RUN CORRECTLY.** 
-  2.⁠ ⁠Install Software/Library/Evo.zip and follow the following on the Arduino IDE: Sketch --> Include Library --> Add .ZIP Library --> Select EvoEditted.zip. 
-  3.⁠ ⁠Open the desired file (i.e. WRO_FE_Colour.ino or WRO_FE_Open.ino) with the Arduino IDE.                    
+  * Install the libraries found in the Software/Library/External_libraries by going to the library manager in the Arduino IDE and installing each of them through the Add .ZIP Library. -- **ALL LIBRARIES ARE REQUIRED FOR THE CODE TO RUN CORRECTLY.**
+  * ⁠ ⁠Install Software/Library/Evo.zip and follow the following on the Arduino IDE: Sketch --> Include Library --> Add .ZIP Library --> Select EvoEditted.zip.
+  *  ⁠Open the desired file (i.e. WRO_FE_Colour.ino or WRO_FE_Open.ino) with the Arduino IDE.                    
 
 ## Reminders before running the bot:
 * Software
